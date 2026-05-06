@@ -1,0 +1,7 @@
+{
+  "name": "embedded-serial-mcp-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ]
+}

@@ -1,0 +1,239 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish_npm:
+        description: 'Publish to npm'
+        type: boolean
+        default: true
+      create_release:
+        description: 'Create GitHub Release'
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from cli/package.json
+        id: version
+        run: echo "version=$(node -p "require('./packages/cli/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+          else
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Created and pushed tag $TAG"
+          fi
+
+  build:
+    name: Build ${{ matrix.npm_platform }}
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            npm_platform: linux-x64
+            ext: ''
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            npm_platform: linux-arm64
+            ext: ''
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            npm_platform: darwin-x64
+            ext: ''
+          - os: macos-14
+            target: aarch64-apple-darwin
+            npm_platform: darwin-arm64
+            ext: ''
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            npm_platform: win32-x64
+            ext: '.exe'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Install cross-compilation dependencies (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo dpkg --add-architecture arm64
+          CODENAME=$(lsb_release -cs 2>/dev/null || echo "noble")
+          for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list; do
+            [ -f "$f" ] || continue
+            if [[ "$f" == *.sources ]]; then
+              grep -q "^URIs:.*ubuntu" "$f" && sudo sed -i '/^Types: deb$/a\Architectures: amd64' "$f" || true
+            else
+              grep -qE "^deb https?://.*ubuntu" "$f" && sudo sed -i 's/^deb /deb [arch=amd64] /' "$f" || true
+            fi
+          done
+          sudo tee /etc/apt/sources.list.d/arm64.list >/dev/null <<EOF
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME} main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-updates main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-security main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-backports main restricted universe multiverse
+          EOF
+          sudo apt-get update || true
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            libudev-dev:arm64
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+          echo "PKG_CONFIG_SYSROOT_DIR=/" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Copy binary to npm package
+        shell: bash
+        run: |
+          mkdir -p packages/${{ matrix.npm_platform }}/bin
+          cp target/${{ matrix.target }}/release/embedded-serial-mcp${{ matrix.ext }} \
+             packages/${{ matrix.npm_platform }}/bin/embedded-serial-mcp${{ matrix.ext }}
+
+      - name: Set executable permission (Unix only)
+        if: runner.os != 'Windows'
+        run: chmod 755 packages/${{ matrix.npm_platform }}/bin/embedded-serial-mcp
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.npm_platform }}
+          path: packages/${{ matrix.npm_platform }}/bin/
+
+  publish-npm:
+    name: Publish to npm
+    needs: [setup, build]
+    if: github.event_name == 'push' || github.event.inputs.publish_npm == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: artifacts
+
+      - name: Organize binaries into package directories
+        shell: bash
+        run: |
+          for artifact_dir in artifacts/binary-*/; do
+            [ -d "$artifact_dir" ] || continue
+            artifact_name=$(basename "$artifact_dir")
+            platform="${artifact_name#binary-}"
+            mkdir -p "packages/$platform/bin"
+            cp "$artifact_dir"* "packages/$platform/bin/"
+          done
+
+      - name: Sync platform package versions
+        run: |
+          VERSION=$(node -p "require('./packages/cli/package.json').version")
+          for pkg in darwin-x64 darwin-arm64 linux-x64 linux-arm64 win32-x64; do
+            json="./packages/$pkg/package.json"
+            node -e "const p=require('$json'); p.version='$VERSION'; require('fs').writeFileSync('$json', JSON.stringify(p, null, 2)+'\n')"
+            echo "Synced $pkg → $VERSION"
+          done
+          node -e "
+            const p = require('./packages/cli/package.json');
+            if (p.optionalDependencies) {
+              for (const key of Object.keys(p.optionalDependencies)) {
+                p.optionalDependencies[key] = '$VERSION';
+              }
+            }
+            require('fs').writeFileSync('./packages/cli/package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+          echo "Synced cli optionalDependencies → $VERSION"
+
+      - name: Publish platform packages
+        shell: bash
+        run: |
+          for pkg in darwin-x64 darwin-arm64 linux-x64 linux-arm64 win32-x64; do
+            cd packages/$pkg
+            npm publish --access public --provenance 2>/dev/null || npm publish --access public
+            cd ../..
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish CLI package
+        run: |
+          cd packages/cli
+          npm publish --access public --provenance 2>/dev/null || npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: [setup, build]
+    if: github.event_name == 'push' || github.event.inputs.create_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: release-artifacts
+
+      - name: Rename binaries for release
+        shell: bash
+        run: |
+          mkdir -p release-files
+          for artifact_dir in release-artifacts/binary-*/; do
+            [ -d "$artifact_dir" ] || continue
+            artifact_name=$(basename "$artifact_dir")
+            platform="${artifact_name#binary-}"
+            bin_file=$(find "$artifact_dir" -maxdepth 1 -type f -name "embedded-serial-mcp*" 2>/dev/null | head -1)
+            [ -f "$bin_file" ] || continue
+            ext=""
+            case "$bin_file" in
+              *.exe) ext=".exe" ;;
+            esac
+            cp "$bin_file" "release-files/embedded-serial-mcp-$platform$ext"
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.setup.outputs.version }}
+          files: release-files/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

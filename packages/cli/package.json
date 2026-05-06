@@ -1,0 +1,24 @@
+{
+  "name": "@vividcodeai/embedded-serial-mcp",
+  "version": "0.0.1",
+  "description": "MCP server for serial port communication",
+  "bin": {
+    "embedded-serial-mcp": "bin/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vividcode-ai/embedded-serial-mcp.git"
+  },
+  "keywords": ["mcp", "serial", "embedded", "uart"],
+  "license": "MIT",
+  "optionalDependencies": {
+    "@vividcodeai/embedded-serial-mcp-darwin-x64": "0.0.1",
+    "@vividcodeai/embedded-serial-mcp-darwin-arm64": "0.0.1",
+    "@vividcodeai/embedded-serial-mcp-linux-x64": "0.0.1",
+    "@vividcodeai/embedded-serial-mcp-linux-arm64": "0.0.1",
+    "@vividcodeai/embedded-serial-mcp-win32-x64": "0.0.1"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
