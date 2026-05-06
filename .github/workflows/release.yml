@@ -92,7 +92,7 @@ jobs:
             if [[ "$f" == *.sources ]]; then
               grep -q "^URIs:.*ubuntu" "$f" && sudo sed -i '/^Types:/a\Architectures: amd64' "$f" || true
             else
-              grep -qE "^deb https?://.*ubuntu" "$f" && sudo sed -i 's/^deb /deb [arch=amd64] /' "$f" || true
+              sudo sed -E -i 's/^deb(\s+\[[^]]*\])?\s+/deb\1 [arch=amd64] /' "$f" || true
             fi
           done
           sudo tee /etc/apt/sources.list.d/arm64.list >/dev/null <<EOF
