@@ -253,7 +253,7 @@ fn decode_data(data: &str, encoding: &str) -> Result<Vec<u8>, String> {
         "utf8" | "utf-8" => Ok(data.as_bytes().to_vec()),
         "hex" => {
             let data = data.trim().replace(' ', "");
-            if data.len() % 2 != 0 {
+            if !data.len().is_multiple_of(2) {
                 return Err("Hex string must have even length".to_string());
             }
             

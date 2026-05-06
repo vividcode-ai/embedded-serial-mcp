@@ -67,9 +67,10 @@ pub enum DataFormat {
     Binary,
 }
 
-impl DataFormat {
-    /// Parse format from string
-    pub fn from_str(s: &str) -> Result<Self> {
+impl std::str::FromStr for DataFormat {
+    type Err = SerialError;
+
+    fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "text" | "utf8" | "string" => Ok(DataFormat::Text),
             "hex" | "hexadecimal" => Ok(DataFormat::Hex),
@@ -79,6 +80,8 @@ impl DataFormat {
         }
     }
 }
+
+
 
 impl std::fmt::Display for DataFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

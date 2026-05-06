@@ -76,23 +76,12 @@ pub struct Args {
 }
 
 /// Main configuration structure
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub server: ServerConfig,
     pub serial: SerialConfig,
     pub security: SecurityConfig,
     pub logging: LoggingConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            serial: SerialConfig::default(),
-            security: SecurityConfig::default(),
-            logging: LoggingConfig::default(),
-        }
-    }
 }
 
 impl Config {

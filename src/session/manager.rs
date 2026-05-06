@@ -12,7 +12,7 @@ use tracing::{debug, info, warn, error};
 use crate::error::{SerialError, SessionError, Result};
 use crate::config::Config;
 use crate::serial::{SerialConnection, ConnectionManager};
-use super::session::{SerialSession, SessionState, SessionConfig, SessionInfo};
+use super::core::{SerialSession, SessionState, SessionConfig, SessionInfo};
 
 /// Session manager for handling multiple serial sessions
 #[derive(Debug)]
@@ -77,10 +77,8 @@ impl SessionManager {
         drop(sessions);
         
         // Check if port is already in use (if port sharing is disabled)
-        if !self.config.serial.allow_port_sharing {
-            if self.is_port_in_use(&config.port_name).await {
-                return Err(SerialError::ConnectionExists(config.port_name.clone()));
-            }
+        if !self.config.serial.allow_port_sharing && self.is_port_in_use(&config.port_name).await {
+            return Err(SerialError::ConnectionExists(config.port_name.clone()));
         }
         
         // Create new session

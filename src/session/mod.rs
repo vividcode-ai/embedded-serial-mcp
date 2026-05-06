@@ -4,7 +4,7 @@
 //! managing multiple serial connections and their associated state.
 
 pub mod manager;
-pub mod session;
+pub mod core;
 
 pub use manager::SessionManager;
-pub use session::{SerialSession, SessionState, SessionConfig};
+pub use core::{SerialSession, SessionState, SessionConfig};

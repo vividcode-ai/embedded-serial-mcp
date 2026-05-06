@@ -29,6 +29,7 @@ impl ConnectionManager {
     }
     
     /// Connect to a serial port with individual parameters (for compatibility with session manager)
+    #[allow(clippy::too_many_arguments)]
     pub async fn connect(
         &self,
         port_name: &str,
