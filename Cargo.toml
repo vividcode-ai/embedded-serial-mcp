@@ -1,6 +1,6 @@
 [package]
 name = "embedded-serial-mcp"
-version = "0.0.5"
+version = "0.0.6"
 edition = "2021"
 authors = ["vividcodeAI <vividcode@gmail.com>", "vividcodeAI"]
 description = "A comprehensive embedded serial MCP server for serial port communication"

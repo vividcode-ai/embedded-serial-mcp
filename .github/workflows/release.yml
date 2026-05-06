@@ -87,21 +87,28 @@ jobs:
         run: |
           sudo dpkg --add-architecture arm64
           CODENAME=$(lsb_release -cs 2>/dev/null || echo "noble")
-          for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list; do
-            [ -f "$f" ] || continue
-            if [[ "$f" == *.sources ]]; then
-              grep -q "^URIs:.*ubuntu" "$f" && sudo sed -i '/^Types:/a\Architectures: amd64' "$f" || true
-            else
-              grep -qE "^deb(\s+\[[^]]*\])?\s+https?://[^[:space:]]*ubuntu\.com" "$f" && sudo sed -E -i '/\[arch=amd64\]/!s/^deb(\s+\[[^]]*\])?\s+/deb\1 [arch=amd64] /' "$f" || true
-            fi
-          done
-          sudo tee /etc/apt/sources.list.d/arm64.list >/dev/null <<EOF
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME} main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-updates main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-security main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-backports main restricted universe multiverse
+          KEYRING=/usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          # Remove default ubuntu.sources (deb822 format, hard to modify reliably)
+          sudo rm -f /etc/apt/sources.list.d/ubuntu.sources
+
+          # Create amd64 sources with explicit [arch=amd64]
+          sudo tee /etc/apt/sources.list.d/amd64.list > /dev/null <<EOF
+          deb [arch=amd64 signed-by=$KEYRING] http://azure.archive.ubuntu.com/ubuntu/ ${CODENAME} main restricted universe multiverse
+          deb [arch=amd64 signed-by=$KEYRING] http://azure.archive.ubuntu.com/ubuntu/ ${CODENAME}-updates main restricted universe multiverse
+          deb [arch=amd64 signed-by=$KEYRING] http://azure.archive.ubuntu.com/ubuntu/ ${CODENAME}-backports main restricted universe multiverse
+          deb [arch=amd64 signed-by=$KEYRING] https://security.ubuntu.com/ubuntu/ ${CODENAME}-security main restricted universe multiverse
           EOF
-          sudo apt-get update || true
+
+          # Create arm64 sources from ports.ubuntu.com
+          sudo tee /etc/apt/sources.list.d/arm64.list > /dev/null <<EOF
+          deb [arch=arm64 signed-by=$KEYRING] http://ports.ubuntu.com/ubuntu-ports ${CODENAME} main restricted universe multiverse
+          deb [arch=arm64 signed-by=$KEYRING] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-updates main restricted universe multiverse
+          deb [arch=arm64 signed-by=$KEYRING] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-security main restricted universe multiverse
+          deb [arch=arm64 signed-by=$KEYRING] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-backports main restricted universe multiverse
+          EOF
+
+          sudo apt-get update
           sudo apt-get install -y \
             gcc-aarch64-linux-gnu \
             libudev-dev:arm64
