@@ -1,9 +1,17 @@
 {
   "name": "@vividcodeai/embedded-serial-mcp-linux-x64",
-  "version": "0.0.1",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "files": ["bin/", "README.md", "README.zh.md"],
+  "version": "0.0.2",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/",
+    "README.md",
+    "README.zh.md"
+  ],
   "description": "Prebuilt binary for Linux x86_64 - embedded-serial-mcp",
   "license": "MIT",
   "repository": {

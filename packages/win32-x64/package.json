@@ -1,9 +1,17 @@
 {
   "name": "@vividcodeai/embedded-serial-mcp-win32-x64",
-  "version": "0.0.1",
-  "os": ["win32"],
-  "cpu": ["x64"],
-  "files": ["bin/", "README.md", "README.zh.md"],
+  "version": "0.0.2",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/",
+    "README.md",
+    "README.zh.md"
+  ],
   "description": "Prebuilt binary for Windows x64 - embedded-serial-mcp",
   "license": "MIT",
   "repository": {

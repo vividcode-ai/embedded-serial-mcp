@@ -1,9 +1,17 @@
 {
   "name": "@vividcodeai/embedded-serial-mcp-darwin-arm64",
-  "version": "0.0.1",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
-  "files": ["bin/", "README.md", "README.zh.md"],
+  "version": "0.0.2",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/",
+    "README.md",
+    "README.zh.md"
+  ],
   "description": "Prebuilt binary for macOS Apple Silicon - embedded-serial-mcp",
   "license": "MIT",
   "repository": {
